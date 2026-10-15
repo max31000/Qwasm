@@ -280,6 +280,11 @@ void    VID_Init (unsigned char *palette)
 #endif
 
     // Load the SDL library
+#ifdef __EMSCRIPTEN__
+    // Keyboard events only while the canvas has focus (the host page keeps its own keys);
+    // "#canvas" is mapped to the host's canvas element by web/pre.js.
+    SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
     if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO) < 0)
         Sys_Error("VID: Couldn't load SDL: %s", SDL_GetError());
 
@@ -340,6 +345,9 @@ void    VID_Init (unsigned char *palette)
 
     if (window == NULL)
         Sys_Error("VID: Couldn't create window: %s\n", SDL_GetError());
+#ifdef __EMSCRIPTEN__
+    SDL_StopTextInput();  // key events only, no IME/text input on the page
+#endif
 
 #ifndef GLQUAKE
     renderer = SDL_CreateRenderer(window, -1, 0);

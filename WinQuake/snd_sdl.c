@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "SDL_audio.h"
 #include "quakedef.h"
+#include "web_api.h"
 
 static dma_t the_shm;
 static int snd_inited;
@@ -16,6 +17,19 @@ static void paint_audio(void *unused, Uint8 *stream, int len)
 		shm->samplepos += len/(shm->samplebits/8)/2;
 		// Check for samplepos overflow?
 		S_PaintChannels (shm->samplepos);
+#ifdef __EMSCRIPTEN__
+		// Bliss host master volume (0..100) on top of the in-game "volume" cvar
+		if (bliss_master_volume < 100 && shm->samplebits == 16) {
+			Sint16 *s = (Sint16 *)stream;
+			int i, n = len / 2;
+			for (i = 0; i < n; i++)
+				s[i] = (Sint16)((s[i] * bliss_master_volume) / 100);
+		} else if (bliss_master_volume < 100) {
+			int i;
+			for (i = 0; i < len; i++)
+				stream[i] = (Uint8)(128 + ((stream[i] - 128) * bliss_master_volume) / 100);
+		}
+#endif
 	}
 }
 

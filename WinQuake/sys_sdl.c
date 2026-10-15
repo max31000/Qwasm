@@ -23,6 +23,7 @@
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include "web_api.h"
 #endif
 
 qboolean			isDedicated;
@@ -42,6 +43,7 @@ extern int recording;
 static int frame;
 #ifdef __EMSCRIPTEN__
 static qboolean restore_busy;
+static qboolean started_pending;
 #endif
 
 // =======================================================================
@@ -68,6 +70,9 @@ void Sys_Printf (char *fmt, ...)
 void Sys_Quit (void)
 {
     Host_Shutdown();
+#ifdef __EMSCRIPTEN__
+    Bliss_Emit("quit", "{}");
+#endif
     exit(0);
 }
 
@@ -113,6 +118,9 @@ void Sys_Error (char *error, ...)
     vsprintf (string,error,argptr);
     va_end (argptr);
 	fprintf(stdout, "Error: %s\n", string);
+#ifdef __EMSCRIPTEN__
+	Bliss_EmitError(string);
+#endif
 
 	Host_Shutdown ();
 	exit (1);
@@ -509,6 +517,13 @@ int main (int c, char **v)
 #endif  // __EMSCRIPTEN__
 }
 
+#ifdef __EMSCRIPTEN__
+void Sys_ResetFrameTime(void)
+{
+    oldtime = Sys_FloatTime() - 0.01;
+}
+#endif
+
 void main_loop(void)
 {
 #ifdef __EMSCRIPTEN__
@@ -525,6 +540,7 @@ void main_loop(void)
             );
 
             wasm_capture_mouse();
+            started_pending = true;
         }
 #endif
 
@@ -555,6 +571,13 @@ void main_loop(void)
         // graphic debugging aids
         if (sys_linerefresh.value)
             Sys_LineRefresh ();
+
+#ifdef __EMSCRIPTEN__
+        if (started_pending) {
+            started_pending = false;  // after the first rendered frame
+            Bliss_Started();
+        }
+#endif
 }
 
 
