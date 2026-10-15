@@ -22,6 +22,8 @@ jobs:
     container: emscripten/emsdk@sha256:e077d54e2b8970575ebc4f185ac1de0b95c05f2b266134d4ba27449af7aebf65
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Install build tools
         run: |
@@ -46,7 +48,14 @@ jobs:
           mkdir -p "dist/${NAME}"
           cp build-web/bin/quake.js build-web/bin/quake.wasm "dist/${NAME}/"
           cp gnu.txt "dist/${NAME}/LICENSE"
-          cp Doc/web.md "dist/${NAME}/README.md"
+          {
+            echo "# quake-web ${VERSION}"
+            echo
+            echo "Built from max31000/Qwasm, ref \`${GITHUB_REF_NAME}\`, commit \`${GITHUB_SHA}\`,"
+            echo "Emscripten 6.0.10. Source: https://github.com/${GITHUB_REPOSITORY}/tree/${GITHUB_SHA}"
+            echo
+            cat Doc/web.md
+          } > "dist/${NAME}/README.md"
           # Files at the archive root.
           tar -C "dist/${NAME}" -czf "dist/${NAME}.tgz" .
           (cd dist && sha256sum "${NAME}.tgz" > "${NAME}.tgz.sha256")
@@ -85,6 +94,6 @@ jobs:
           if ! gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
               --title "Web build $VERSION" \
-              --notes "Quake (Qwasm, software renderer) web build (Emscripten 6.0.10). Contains quake.js (ES module, factory createQuake) and quake.wasm. No game data. Host contract: Doc/web.md."
+              --notes "Quake (Qwasm, software renderer) web build (Emscripten 6.0.10), tag $GITHUB_REF_NAME, commit $GITHUB_SHA. Contains quake.js (ES module, factory createQuake) and quake.wasm. No game data. Host contract: Doc/web.md."
           fi
           gh release upload "$GITHUB_REF_NAME" dist/*.tgz dist/*.sha256 --repo "$GITHUB_REPOSITORY" --clobber

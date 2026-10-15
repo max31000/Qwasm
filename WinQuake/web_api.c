@@ -9,6 +9,47 @@
 
 int bliss_master_volume = 100;  // 0..100, applied in the SDL audio callback (snd_sdl.c)
 static int bliss_paused = 0;
+int bliss_disposed = 0;         // set by bliss_dispose / quit: every export is a no-op afterwards
+
+static void exit_pointer_lock(void)
+{
+	EM_ASM({
+		if (typeof document != "undefined" && Module["canvas"] &&
+			document.pointerLockElement === Module["canvas"]) document.exitPointerLock();
+	});
+}
+
+// Shuts the engine down (writes config.cfg, closes audio, VID_Shutdown -> SDL_Quit which also
+// removes SDL's DOM listeners) and runs the JS side of the dispose (pre.js listeners, pointer
+// lock, AudioContext). Safe outside the main loop and while paused.
+void Bliss_Shutdown(void)
+{
+	if (bliss_disposed)
+		return;
+	bliss_disposed = 1;
+	emscripten_cancel_main_loop();
+	if (host_initialized)
+		Host_Shutdown();   // S_Shutdown (SNDDMA_Shutdown), VID_Shutdown (SDL_Quit)
+	else
+		SDL_Quit();
+	exit_pointer_lock();
+	EM_ASM({ if (Module["blissDisposeJs"]) Module["blissDisposeJs"](); });
+}
+
+// Host API: release everything; the module is unusable afterwards. Idempotent.
+EMSCRIPTEN_KEEPALIVE void bliss_dispose(void)
+{
+	Bliss_Shutdown();
+}
+
+// Host API: quit like the in-game Quit (emits "quit"), also while paused. Idempotent.
+EMSCRIPTEN_KEEPALIVE void bliss_quit(void)
+{
+	if (bliss_disposed)
+		return;
+	Bliss_Shutdown();
+	Bliss_Emit("quit", "{}");
+}
 
 void Bliss_Emit(const char *type, const char *json)
 {
@@ -56,15 +97,17 @@ void Bliss_Started(void)
 EMSCRIPTEN_KEEPALIVE void bliss_clear_keys(void)
 {
 	// Releases every held key (+forward etc.), e.g. when the canvas loses focus.
-	Key_ClearStates();
+	if (!bliss_disposed)
+		Key_ClearStates();
 }
 
 EMSCRIPTEN_KEEPALIVE void bliss_pause(void)
 {
-	if (bliss_paused)
+	if (bliss_paused || bliss_disposed)
 		return;
 	bliss_paused = 1;
 	Key_ClearStates();
+	exit_pointer_lock();
 	emscripten_pause_main_loop();
 	SDL_PauseAudio(1);
 	Bliss_Emit("pauseChanged", "{\"paused\":true}");
@@ -72,7 +115,7 @@ EMSCRIPTEN_KEEPALIVE void bliss_pause(void)
 
 EMSCRIPTEN_KEEPALIVE void bliss_resume(void)
 {
-	if (!bliss_paused)
+	if (!bliss_paused || bliss_disposed)
 		return;
 	bliss_paused = 0;
 	Sys_ResetFrameTime();  // no catch-up step for the paused time
@@ -101,6 +144,8 @@ EMSCRIPTEN_KEEPALIVE int bliss_get_master_volume(void)
 // Quake's "sensitivity" cvar (menu slider range 1..11, Qwasm default 4).
 EMSCRIPTEN_KEEPALIVE void bliss_set_mouse_sensitivity(float value)
 {
+	if (bliss_disposed)
+		return;
 	if (value < 0.1f) value = 0.1f;
 	if (value > 30.0f) value = 30.0f;
 	Cvar_SetValue("sensitivity", value);
@@ -115,6 +160,8 @@ EMSCRIPTEN_KEEPALIVE float bliss_get_mouse_sensitivity(void)
 EMSCRIPTEN_KEEPALIVE void bliss_new_game(int skill)
 {
 	char cmd[64];
+	if (bliss_disposed)
+		return;
 	if (skill < 0) skill = 0;
 	if (skill > 3) skill = 3;
 	key_dest = key_game;
@@ -127,7 +174,7 @@ EMSCRIPTEN_KEEPALIVE void bliss_new_game(int skill)
 // Runs a console command line (e.g. "bind x +jump", "volume 0.5").
 EMSCRIPTEN_KEEPALIVE void bliss_command(const char *line)
 {
-	if (!line || !*line)
+	if (!line || !*line || bliss_disposed)
 		return;
 	Cbuf_AddText((char *)line);
 	Cbuf_AddText("\n");

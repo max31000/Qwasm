@@ -7,6 +7,8 @@ extern int bliss_master_volume;  // 0..100
 void Bliss_Emit(const char *type, const char *json);
 void Bliss_EmitError(const char *message);
 void Bliss_Started(void);
+void Bliss_Shutdown(void);       // web_api.c: engine + SDL + JS listeners, idempotent
+extern int bliss_disposed;
 void Sys_ResetFrameTime(void);   // sys_sdl.c
 #endif
 

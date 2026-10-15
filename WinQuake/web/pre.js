@@ -10,9 +10,19 @@
 // - Canvas: made focusable, keyboard input only while it has focus (SDL keyboard element),
 //   no context menu (right mouse button is bound), pointer lock on click (mouse look),
 //   held keys are released when it loses focus.
-// - Saves/config are kept in IndexedDB (IDBFS at /qwasm, upstream Qwasm behaviour).
+// - Saves/config are kept in IndexedDB (IDBFS at /bliss-quake).
+// - Auto-pause while the tab is hidden (`Module.blissAutoPause`, default true).
+// - Every listener is registered with one AbortController; Module.blissDisposeJs() (called by
+//   _bliss_dispose and the in-game Quit) removes them, exits pointer lock, closes the AudioContext.
 // - Resumes the SDL2 AudioContext on the first user gesture (autoplay policy).
 (function () {
+  var ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var sig = ac ? ac.signal : undefined;
+  function on(target, type, fn, opts) {
+    var o = opts ? Object.assign({}, opts) : {};
+    if (sig) o.signal = sig;
+    target.addEventListener(type, fn, o);
+  }
   var dataDir = Module['blissDataDir'] || '/data';
   Module['blissDataDir'] = dataDir;
 
@@ -48,6 +58,7 @@
     var canvas = Module['canvas'];
     if (!canvas || Module['blissPointerLock'] === false) return;
     if (typeof document === 'undefined' || document.pointerLockElement === canvas) return;
+    if (Module['blissDisposed']) return;
     if (Module['_bliss_is_paused'] && Module['_bliss_is_paused']()) return;
     try {
       var p = canvas.requestPointerLock();
@@ -61,13 +72,12 @@
 
   function setupCanvas() {
     var canvas = Module['canvas'];
-    if (!canvas || canvas.__blissSetup) return;
-    canvas.__blissSetup = true;
+    if (!canvas) return;
     if (!canvas.hasAttribute('tabindex')) canvas.setAttribute('tabindex', '0');
-    canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-    canvas.addEventListener('pointerdown', function () { canvas.focus({ preventScroll: true }); });
-    canvas.addEventListener('click', lockPointer);
-    canvas.addEventListener('blur', function () {
+    on(canvas, 'contextmenu', function (e) { e.preventDefault(); });
+    on(canvas, 'pointerdown', function () { canvas.focus({ preventScroll: true }); });
+    on(canvas, 'click', lockPointer);
+    on(canvas, 'blur', function () {
       if (Module['_bliss_clear_keys'] && Module['blissStarted']) Module['_bliss_clear_keys']();
     });
   }
@@ -81,7 +91,37 @@
   }
   if (typeof window !== 'undefined') {
     ['keydown', 'pointerdown', 'touchstart'].forEach(function (type) {
-      window.addEventListener(type, resumeAudio, { capture: true, passive: true });
+      on(window, type, resumeAudio, { capture: true, passive: true });
     });
   }
+
+  // ---- auto-pause while the tab is hidden ---------------------------------------------------
+  var autoPaused = false;
+  if (typeof document !== 'undefined') {
+    on(document, 'visibilitychange', function () {
+      if (Module['blissAutoPause'] === false || !Module['blissStarted'] || Module['blissDisposed']) return;
+      if (document.hidden) {
+        if (!Module['_bliss_is_paused']()) { autoPaused = true; Module['_bliss_pause'](); }
+      } else if (autoPaused) {
+        autoPaused = false;
+        if (Module['_bliss_is_paused']()) Module['_bliss_resume']();
+      }
+    });
+  }
+
+  // ---- dispose (JS side) --------------------------------------------------------------------
+  Module['blissDisposeJs'] = function () {
+    if (Module['blissDisposed']) return;
+    Module['blissDisposed'] = true;
+    if (ac) ac.abort();
+    try {
+      if (typeof document !== 'undefined' && Module['canvas'] &&
+          document.pointerLockElement === Module['canvas']) document.exitPointerLock();
+    } catch (e) { /* ignore */ }
+    var sdl2 = Module['SDL2'];
+    var ctx = sdl2 && sdl2.audioContext;
+    if (ctx && ctx.state !== 'closed') { try { ctx.close(); } catch (e) { /* ignore */ } }
+    if (typeof specialHTMLTargets !== 'undefined' && specialHTMLTargets['#canvas'] === Module['canvas'])
+      delete specialHTMLTargets['#canvas'];
+  };
 })();

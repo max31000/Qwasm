@@ -35,7 +35,7 @@ target_compile_options(quake PRIVATE -O3 -ffast-math -fomit-frame-pointer -sUSE_
     -Wno-sign-compare -Wno-pointer-sign -Wno-unused-variable -Wno-unused-but-set-variable
     -Wno-dangling-else -Wno-parentheses -Wno-unused-function -Wno-format-security)
 
-set(WEB_EXPORTS "_main,_bliss_pause,_bliss_resume,_bliss_is_paused,_bliss_set_master_volume,_bliss_get_master_volume,_bliss_set_mouse_sensitivity,_bliss_get_mouse_sensitivity,_bliss_new_game,_bliss_command,_bliss_clear_keys,_bliss_pointer_lock_lost,_malloc,_free")
+set(WEB_EXPORTS "_main,_bliss_pause,_bliss_resume,_bliss_is_paused,_bliss_set_master_volume,_bliss_get_master_volume,_bliss_set_mouse_sensitivity,_bliss_get_mouse_sensitivity,_bliss_new_game,_bliss_command,_bliss_clear_keys,_bliss_pointer_lock_lost,_bliss_dispose,_bliss_quit,_malloc,_free")
 # Settings are id Software's own: quake.rc runs default.cfg from pak0.pak (original key bindings,
 # gamma 1.0, ...), then the saved config.cfg (IDBFS), then web/autoexec.cfg (embedded: +mlook).
 # Qwasm's config.cfg/wasm.cfg (WASD, gamma 0.65) are not used by the Bliss build.

@@ -69,9 +69,13 @@ void Sys_Printf (char *fmt, ...)
 
 void Sys_Quit (void)
 {
-    Host_Shutdown();
 #ifdef __EMSCRIPTEN__
+    // Host_Shutdown (config, audio, VID_Shutdown -> SDL_Quit) + pre.js listeners/AudioContext;
+    // exit() then unwinds the current main-loop iteration (no runtime exit, no throw to the host).
+    Bliss_Shutdown();
     Bliss_Emit("quit", "{}");
+#else
+    Host_Shutdown();
 #endif
     exit(0);
 }
@@ -122,7 +126,11 @@ void Sys_Error (char *error, ...)
 	Bliss_EmitError(string);
 #endif
 
+#ifdef __EMSCRIPTEN__
+	Bliss_Shutdown ();
+#else
 	Host_Shutdown ();
+#endif
 	exit (1);
 
 } 
@@ -413,8 +421,8 @@ void wasm_init_fs(void)
 		FS.mkdir("/id1");
 		FS.mount(IDBFS, {}, "/id1");
 #endif
-		FS.mkdir("/qwasm");
-		FS.mount(IDBFS, {}, "/qwasm");
+		FS.mkdir("/bliss-quake");
+		FS.mount(IDBFS, {}, "/bliss-quake");
 		console.info("Loading data...");
 		FS.syncfs(true, function (err) {
 			if (err)

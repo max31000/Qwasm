@@ -31,7 +31,8 @@
   const canvas = document.getElementById('game');
   window.blissEvents = [];
   const pak = new Uint8Array(await (await fetch('./pak0.pak')).arrayBuffer());
-  const M = await createQuake({
+  // window.blissCreate() makes a new instance (create -> dispose -> create tests).
+  window.blissCreate = () => createQuake({
     canvas,
     blissWidth: 640, blissHeight: 480,
     locateFile: (name) => './' + name,
@@ -44,7 +45,9 @@
     print: (t) => console.log(t),
     printErr: (t) => console.warn(t),
   });
+  let M = await window.blissCreate();
   window.Module = M;
+  window.blissRecreate = async () => { M._bliss_dispose(); M = await window.blissCreate(); window.Module = M; return true; };
   document.getElementById('pause').onclick = () => {
     if (M._bliss_is_paused()) M._bliss_resume(); else M._bliss_pause();
   };
