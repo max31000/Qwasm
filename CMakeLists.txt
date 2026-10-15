@@ -35,20 +35,20 @@ target_compile_options(quake PRIVATE -O3 -ffast-math -fomit-frame-pointer -sUSE_
     -Wno-sign-compare -Wno-pointer-sign -Wno-unused-variable -Wno-unused-but-set-variable
     -Wno-dangling-else -Wno-parentheses -Wno-unused-function -Wno-format-security)
 
-set(WEB_EXPORTS "_main,_bliss_pause,_bliss_resume,_bliss_is_paused,_bliss_set_master_volume,_bliss_get_master_volume,_bliss_set_mouse_sensitivity,_bliss_get_mouse_sensitivity,_bliss_new_game,_bliss_command,_bliss_clear_keys,_malloc,_free")
-# The three tiny Qwasm .cfg files (key bindings, defaults) are engine config, not game data;
-# they are embedded. pak0.pak is written by the host into /data/id1 (preRun).
+set(WEB_EXPORTS "_main,_bliss_pause,_bliss_resume,_bliss_is_paused,_bliss_set_master_volume,_bliss_get_master_volume,_bliss_set_mouse_sensitivity,_bliss_get_mouse_sensitivity,_bliss_new_game,_bliss_command,_bliss_clear_keys,_bliss_pointer_lock_lost,_malloc,_free")
+# Settings are id Software's own: quake.rc runs default.cfg from pak0.pak (original key bindings,
+# gamma 1.0, ...), then the saved config.cfg (IDBFS), then web/autoexec.cfg (embedded: +mlook).
+# Qwasm's config.cfg/wasm.cfg (WASD, gamma 0.65) are not used by the Bliss build.
+# pak0.pak is written by the host into /data/id1 (preRun).
 set(WEB_LINK_FLAGS
     "-O3 -sUSE_SDL=2 -sINITIAL_MEMORY=64MB -sSTACK_SIZE=2MB -sALLOW_MEMORY_GROWTH=1"
     "-sENVIRONMENT=web -lidbfs.js"
     "-sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=createQuake"
     "-sEXPORTED_FUNCTIONS=${WEB_EXPORTS}"
     "-sEXPORTED_RUNTIME_METHODS=ccall,cwrap,UTF8ToString,stringToUTF8,FS,addRunDependency,removeRunDependency"
-    "--embed-file ${Q}/id1/autoexec.cfg@/data/id1/autoexec.cfg"
-    "--embed-file ${Q}/id1/config.cfg@/data/id1/config.cfg"
-    "--embed-file ${Q}/id1/wasm.cfg@/data/id1/wasm.cfg"
-    "--pre-js ${WEB_DIR}/pre.js --js-library ${WEB_DIR}/library_bliss.js")
+    "--embed-file ${WEB_DIR}/autoexec.cfg@/data/id1/autoexec.cfg"
+    "--pre-js ${WEB_DIR}/pre.js --pre-js ${WEB_DIR}/pre-mouse.js --js-library ${WEB_DIR}/library_bliss.js")
 string(REPLACE ";" " " WEB_LINK_FLAGS "${WEB_LINK_FLAGS}")
 set_target_properties(quake PROPERTIES LINK_FLAGS "${WEB_LINK_FLAGS}")
 set_property(TARGET quake APPEND PROPERTY LINK_DEPENDS
-    "${WEB_DIR}/pre.js;${WEB_DIR}/library_bliss.js;${Q}/id1/autoexec.cfg;${Q}/id1/config.cfg;${Q}/id1/wasm.cfg")
+    "${WEB_DIR}/pre.js;${WEB_DIR}/pre-mouse.js;${WEB_DIR}/library_bliss.js;${WEB_DIR}/autoexec.cfg")

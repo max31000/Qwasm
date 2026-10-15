@@ -32,7 +32,10 @@ const M = await createQuake({
 The canvas' `width`/`height` attributes are set to the framebuffer size; size it with CSS
 (4:3, `image-rendering: pixelated` keeps the software-renderer look). `<dataDir>/id1` exists
 before the host's `preRun` runs; `<dataDir>` becomes the working directory. The Qwasm key
-bindings/defaults (`autoexec.cfg`, `config.cfg`, `wasm.cfg`: WASD + mouse look) are embedded.
+defaults are id Software's own: `quake.rc` runs `default.cfg` from pak0.pak (original key
+bindings: arrows move/turn, Ctrl fire, Alt strafe, Shift run, Space/Enter jump, `/` next weapon,
+F-keys as in DOS; gamma 1.0, sensitivity 3), then the saved `config.cfg`, then the embedded
+`web/autoexec.cfg` (`+mlook`: mouse look on). Qwasm's WASD `config.cfg`/`wasm.cfg` are not used.
 
 ## Events (`onBlissEvent(type, json)`)
 
@@ -53,13 +56,17 @@ bindings/defaults (`autoexec.cfg`, `config.cfg`, `wasm.cfg`: WASD + mouse look) 
 | `_bliss_new_game(skill 0..3)` | `map start` (like Single Player -> New Game) |
 | `ccall('bliss_command', null, ['string'], [line])` | console command line |
 | `_bliss_clear_keys()` | releases held keys (called automatically on canvas blur) |
+| `_bliss_pointer_lock_lost()` | opens the game menu if playing and not host-paused (web/pre-mouse.js calls it when the browser released the pointer lock without an Esc key event) |
 
 ## Input
 
 Keyboard is only read while the canvas has focus (`SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT`,
-text input stopped). Click on the canvas focuses it and requests pointer lock (mouse look);
-Esc releases it (browser) and opens the game menu. Right click is bound (+forward), so the
-context menu is suppressed.
+text input stopped). Click on the canvas focuses it and requests pointer lock (mouse look).
+Mouse movement and buttons reach the game only while the canvas holds the lock (the click
+that requests it is not a shot; moving the cursor over an unlocked canvas does nothing).
+Esc releases the lock (the browser does not pass that key press to the page) and the build then
+opens the game menu (web/pre-mouse.js), as Esc does. Right click is bound (+forward), so the context menu is
+suppressed. A host that pauses the game should release the lock itself (`exitPointerLock`).
 
 ## Persistence, audio
 

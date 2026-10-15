@@ -31,6 +31,24 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 #include <emscripten.h>
 #endif
 
+#if defined(__EMSCRIPTEN__) && defined(BLISS_WEB)
+// Bliss: 1 while the canvas holds the pointer lock (mouse look only then).
+EM_JS(int, Bliss_PointerLocked, (void), {
+    return (typeof document != "undefined" && Module["canvas"] &&
+        document.pointerLockElement === Module["canvas"]) ? 1 : 0;
+});
+
+// The browser released the pointer lock (Esc, which the page does not receive) while playing:
+// open the game menu as the Esc key would have. Called by web/pre-mouse.js.
+EMSCRIPTEN_KEEPALIVE void bliss_pointer_lock_lost(void)
+{
+    if (key_dest != key_game || cls.state != ca_connected)
+        return;
+    Key_ClearStates();
+    M_ToggleMenu_f();
+}
+#endif
+
 unsigned short  d_8to16table[256];
 
 // The original defaults
@@ -645,7 +663,15 @@ void Sys_SendKeyEvents(void)
                 break;
 
             case SDL_MOUSEMOTION:
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__) && defined(BLISS_WEB)
+                // Bliss: mouse look only under pointer lock (requested by web/pre.js on a click);
+                // moving the cursor over the unlocked canvas must not turn the view. SDL reports
+                // movementX/Y as xrel while the canvas holds the lock.
+                if (Bliss_PointerLocked()) {
+                    mouse_x += event.motion.xrel*2;
+                    mouse_y += event.motion.yrel*2;
+                }
+#elif defined(__EMSCRIPTEN__)
                 // The pointer does not get warped to the centre of the canvas
                 // when captured in WebAssembly -- it is constrained to the
                 // bounding box, but relative moves can still travel outside
@@ -716,6 +742,10 @@ void IN_Commands (void)
     if (!mouse_avail) return;
    
     i = SDL_GetMouseState(NULL, NULL);
+#if defined(__EMSCRIPTEN__) && defined(BLISS_WEB)
+    // Bliss: the click that focuses the canvas / requests the pointer lock is not a shot.
+    if (!Bliss_PointerLocked()) i = 0;
+#endif
     /* Quake swaps the second and third buttons */
     mouse_buttonstate = (i & ~0x06) | ((i & 0x02)<<1) | ((i & 0x04)>>1);
     for (i=0 ; i<3 ; i++) {
