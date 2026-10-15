@@ -45,7 +45,7 @@ jobs:
           NAME="quake-web-${VERSION}"
           mkdir -p "dist/${NAME}"
           cp build-web/bin/quake.js build-web/bin/quake.wasm "dist/${NAME}/"
-          cp WinQuake/gnu.txt "dist/${NAME}/LICENSE"
+          cp gnu.txt "dist/${NAME}/LICENSE"
           cp Doc/web.md "dist/${NAME}/README.md"
           # Files at the archive root.
           tar -C "dist/${NAME}" -czf "dist/${NAME}.tgz" .
