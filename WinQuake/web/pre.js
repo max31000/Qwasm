@@ -23,6 +23,8 @@
     if (sig) o.signal = sig;
     target.addEventListener(type, fn, o);
   }
+  // For the other --pre-js files: listeners removed by the dispose.
+  Module['blissOn'] = on;
   var dataDir = Module['blissDataDir'] || '/data';
   Module['blissDataDir'] = dataDir;
 

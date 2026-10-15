@@ -40,8 +40,12 @@ EM_JS(int, Bliss_PointerLocked, (void), {
 
 // The browser released the pointer lock (Esc, which the page does not receive) while playing:
 // open the game menu as the Esc key would have. Called by web/pre-mouse.js.
+extern int bliss_disposed;  // web_api.c
+
 EMSCRIPTEN_KEEPALIVE void bliss_pointer_lock_lost(void)
 {
+    if (bliss_disposed)
+        return;
     if (key_dest != key_game || cls.state != ca_connected)
         return;
     Key_ClearStates();
